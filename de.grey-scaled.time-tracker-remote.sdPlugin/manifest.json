@@ -1,0 +1,70 @@
+{
+	"$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+	"Name": "Time Tracker Remote",
+	"Version": "0.1.0.0",
+	"Author": "Ian Grey",
+	"Actions": [
+		{
+			"Name": "Timer Toggle",
+			"UUID": "de.grey-scaled.time-tracker-remote.timer-toggle",
+			"Icon": "imgs/actions/timer-toggle/icon",
+			"Tooltip": "Start/stop/switch to a specified time tracker.",
+			"PropertyInspectorPath": "ui/timer-toggle.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"States": [
+				{
+					"Image": "imgs/actions/timer-toggle/key",
+					"TitleAlignment": "middle"
+				}
+			]
+		},
+		{
+			"Name": "Timer Dial",
+			"UUID": "de.grey-scaled.time-tracker-remote.timer-dial",
+			"Icon": "imgs/actions/timer-dial/key",
+			"Tooltip": "Start/stop/switch to an assortment of trackers.",
+			"PropertyInspectorPath": "ui/timer-dial.html",
+			"Controllers": [
+				"Encoder"
+			],
+			"Encoder": {
+				"layout": "$A1",
+				"TriggerDescription": {
+					"Rotate": "Select tag",
+					"Push": "Start / stop timer",
+					"Touch": "Start / stop timer"
+				}
+			},
+			"States": [
+				{
+					"Image": "imgs/actions/timer-dial/key"
+				}
+			]
+		}
+	],
+	"Category": "Time Tracker Remote",
+	"CategoryIcon": "imgs/plugin/category-icon",
+	"CodePath": "bin/plugin.js",
+	"Description": "A plugin that allows to \"remote control\" time tracking software. Allows starting and stopping timers. Currently supported: Traggo, Toggl Track.",
+	"Icon": "imgs/plugin/marketplace",
+	"SDKVersion": 3,
+	"Software": {
+		"MinimumVersion": "6.9"
+	},
+	"OS": [
+		{
+			"Platform": "mac",
+			"MinimumVersion": "12"
+		},
+		{
+			"Platform": "windows",
+			"MinimumVersion": "10"
+		}
+	],
+	"Nodejs": {
+		"Version": "20"
+	},
+	"UUID": "de.grey-scaled.time-tracker-remote"
+}

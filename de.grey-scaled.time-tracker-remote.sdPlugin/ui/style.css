@@ -1,0 +1,284 @@
+﻿/* ── Shared utility ──────────────────────────────────────────────────── */
+.tpi-hidden { display: none !important; }
+
+/* ── Form controls ───────────────────────────────────────────────────── */
+.tpi-select {
+    width: 100%;
+    height: 28px;
+    background-color: #3d3d3d;
+    color: #d8d8d8;
+    font-size: 9pt;
+    font-family: "Segoe UI", Arial, Roboto, Helvetica, sans-serif;
+    box-sizing: border-box;
+}
+
+.tpi-input {
+    width: 100%;
+    background-color: #3d3d3d;
+    color: #d8d8d8;
+    border: none;
+    border-radius: 0;
+    padding: 7px 4px;
+    font-size: 9pt;
+    font-family: "Segoe UI", Arial, Roboto, Helvetica, sans-serif;
+    box-sizing: border-box;
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+.tpi-select option.tpi-placeholder { font-style: italic; }
+
+/* ── Token row (input + inline action buttons) ───────────────────────── */
+.tpi-token-row {
+    display: flex;
+    gap: 4px;
+    width: 100%;
+}
+.tpi-token-row .tpi-input {
+    flex: 1;
+    min-width: 0;
+}
+.tpi-token-row .tpi-btn {
+    flex-shrink: 0;
+    width: auto;
+    padding: 6px 8px;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────── */
+.tpi-btn {
+    width: 100%;
+    background-color: #2d2d2d;
+    color: #d8d8d8;
+    border: 1px solid #969696;
+    border-radius: 3px;
+    padding: 6px;
+    font-size: 9pt;
+    font-family: "Segoe UI", Arial, Roboto, Helvetica, sans-serif;
+    cursor: pointer;
+}
+
+.tpi-btn:not(:disabled):hover { background-color: #464646; }
+.tpi-btn:disabled { opacity: 0.5; cursor: default; }
+
+.tpi-btn-group {
+    display: flex;
+    gap: 4px;
+}
+
+.tpi-btn-group .tpi-btn {
+    flex: 1;
+    width: auto;
+}
+
+.tpi-btn-secondary { opacity: 0.65; }
+.tpi-btn-secondary:not(:disabled):hover { opacity: 1; background: #464646; }
+
+/* ── Icon buttons ────────────────────────────────────────────────────── */
+.tpi-icon-btn {
+    background-color: #2d2d2d;
+    color: #d8d8d8;
+    border: 1px solid #969696;
+    border-radius: 3px;
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    font-size: 17px;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tpi-icon-btn:hover:not(:disabled) { background-color: #464646; }
+.tpi-icon-btn:disabled { opacity: 0.5; cursor: default; }
+/* SVG children must not capture pointer events so the button id is always the target */
+.tpi-icon-btn svg, .tpi-icon-btn svg * { pointer-events: none; }
+
+/* Ghost icon — no border/background, used for inline row actions */
+.tpi-icon-btn-ghost {
+    background: none;
+    border: none;
+    color: #969696;
+    padding: 0 2px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    opacity: 0.5;
+    margin-top: 3px;
+}
+
+.tpi-icon-btn-ghost:hover { opacity: 1; color: #d8d8d8; }
+.tpi-icon-btn-ghost svg, .tpi-icon-btn-ghost svg * { pointer-events: none; }
+
+/* ── Account controls ────────────────────────────────────────────────── */
+.tpi-account-controls {
+    display: flex;
+    gap: 2px;
+    width: 100%;
+}
+
+.tpi-account-controls .tpi-select {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ── Section heading ─────────────────────────────────────────────────── */
+.tpi-section-heading {
+    font-size: 9pt;
+    font-weight: 600;
+    padding: 6px 8px 4px;
+    color: #d8d8d8;
+    letter-spacing: 0.02em;
+    font-family: "Segoe UI", Arial, Roboto, Helvetica, sans-serif;
+    text-align: center;
+}
+
+/* ── Edit section field rows (mirrors sdpi-item grid) ────────────────── */
+.tpi-field {
+    display: grid;
+    grid-template-columns: 95px 1fr;
+    align-items: start;
+    margin: 0 0 10px 0;
+    color: #969696;
+    font-family: "Segoe UI", Arial, Roboto, Helvetica, sans-serif;
+    font-size: 9pt;
+}
+
+.tpi-field-label {
+    display: flex;
+    align-items: center;
+    justify-self: end;
+    min-height: 28px;
+    padding-right: 11px;
+    text-align: right;
+}
+
+/* ── Status / error messages ─────────────────────────────────────────── */
+#tpi-login-error {
+    color: #e04040;
+    font-size: 9pt;
+    padding: 2px 6px 4px;
+}
+
+#tags-status {
+    font-size: 10px;
+    margin: 2px 6px 4px;
+    opacity: 0.65;
+}
+
+#tags-status.error {
+    color: #e04040;
+    opacity: 1;
+}
+
+/* ── Edit account label ──────────────────────────────────────────────── */
+#tpi-edit-label {
+    display: flex;
+    align-items: center;
+    min-height: 28px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Tag sort list (dial only) ───────────────────────────────────────── */
+.tag-sort-list {
+    width: 100%;
+    background-color: #3d3d3d;
+    color: #d8d8d8;
+    border: 1px solid #969696;
+    border-radius: 3px;
+    max-height: 200px;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+.tag-sort-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 2px 6px;
+}
+
+.tag-sort-row + .tag-sort-row {
+    border-top: 1px solid rgba(255,255,255,0.07);
+}
+
+.tag-sort-row.drag-over { background: #3a5a8a; }
+
+.tag-sort-row input[type=checkbox] {
+    margin: 4px 0 0;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.tag-sort-label {
+    flex: 1;
+    font-size: 9pt;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tag-drag-handle {
+    cursor: grab;
+    flex-shrink: 0;
+    opacity: 0.5;
+    font-size: 14px;
+    padding: 0 2px;
+    line-height: 1;
+    user-select: none;
+    margin-left: auto;
+    margin-top: 3px;
+}
+
+.tag-drag-handle:active { cursor: grabbing; }
+
+/* ── Debug mode toggle ───────────────────────────────────────────────── */
+.tpi-debug-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #969696;
+    font-size: 9pt;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* ── Per-tag inline edit fields ───────────────────────────────────────────────────── */
+.tag-edit-fields {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    padding: 1px 0;
+}
+
+.tag-meta-input {
+    width: 100%;
+    background-color: transparent;
+    color: #d8d8d8;
+    border: none;
+    border-bottom: 1px solid #555;
+    padding: 2px 2px;
+    font-size: 9pt;
+    font-family: "Segoe UI", Arial, Roboto, Helvetica, sans-serif;
+    box-sizing: border-box;
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+.tag-meta-input:focus {
+    outline: none;
+    border-bottom-color: #7986cb;
+}
+
+.tag-meta-input::placeholder {
+    opacity: 0.4;
+    font-style: italic;
+}

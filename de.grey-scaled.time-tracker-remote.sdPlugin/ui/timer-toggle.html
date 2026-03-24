@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Timer Toggle Settings</title>
+    <meta charset="utf-8" />
+    <script src="sdpi-components.js"></script>
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+    <!-- ── Account section ───────────────────────────────────────────── -->
+    <div id="tpi-account-section" class="tpi-hidden">
+        <sdpi-item label="Account">
+            <div class="tpi-account-controls">
+                <select id="tpi-account-select" class="tpi-select">
+                    <option class="tpi-placeholder" value="" disabled selected>No account available</option>
+                </select>
+                <button id="tpi-add-btn" class="tpi-icon-btn" title="Add account">+</button>
+                <button id="tpi-edit-btn" class="tpi-icon-btn" title="Edit account" disabled><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button id="tpi-remove-btn" class="tpi-icon-btn" title="Remove account" disabled>&#x2212;</button>
+            </div>
+        </sdpi-item>
+    </div>
+
+    <!-- ── Login form (hidden until Add account is clicked) ──────────── -->
+    <div id="tpi-login-section" class="tpi-hidden">
+        <div class="tpi-section-heading">Add account</div>
+        <sdpi-item label="Backend">
+            <select id="tpi-backend-select" class="tpi-select">
+                <option value="traggo" selected>Traggo</option>
+                <option value="toggl">Toggl Track</option>
+            </select>
+        </sdpi-item>
+
+        <!-- Traggo-specific fields -->
+        <div id="tpi-traggo-fields">
+            <sdpi-item label="URL">
+                <input class="tpi-input" id="tpi-login-url" type="text" placeholder="http://traggo:3030" />
+            </sdpi-item>
+            <sdpi-item label="User">
+                <input class="tpi-input" id="tpi-login-user" type="text" placeholder="username" />
+            </sdpi-item>
+            <sdpi-item label="Password">
+                <input class="tpi-input" id="tpi-login-pass" type="password" placeholder="password" />
+            </sdpi-item>
+        </div>
+
+        <!-- Toggl-specific fields -->
+        <div id="tpi-toggl-fields" class="tpi-hidden">
+            <sdpi-item label="API token">
+                <div class="tpi-token-row">
+                    <input class="tpi-input" id="tpi-toggl-token" type="text" placeholder="Your Toggl API token" />
+                    <button class="tpi-btn" id="tpi-toggl-load-btn">Login</button>
+                    <button class="tpi-btn" id="tpi-toggl-get-btn" title="Open Toggl profile to copy your API token">Get</button>
+                </div>
+            </sdpi-item>
+            <sdpi-item label="Workspace">
+                <select id="tpi-toggl-workspace" class="tpi-select">
+                    <option value="" disabled selected>No workspace available</option>
+                </select>
+            </sdpi-item>
+        </div>
+
+        <sdpi-item label="Polling rate">
+            <select id="tpi-login-interval" class="tpi-select"></select>
+        </sdpi-item>
+        <sdpi-item>
+            <div class="tpi-btn-group">
+                <button class="tpi-btn tpi-btn-secondary" id="tpi-login-cancel">Cancel</button>
+                <button class="tpi-btn" id="tpi-login-submit">Log in</button>
+            </div>
+        </sdpi-item>
+        <div id="tpi-login-error" class="tpi-hidden"></div>
+    </div>
+
+    <!-- ── Edit account section ──────────────────────────────────────── -->
+    <div id="tpi-edit-section" class="tpi-hidden">
+        <div class="tpi-section-heading">Edit account</div>
+        <sdpi-item label="Account">
+            <span id="tpi-edit-label"></span>
+        </sdpi-item>
+        <sdpi-item label="Timer interval">
+            <select id="tpi-edit-interval" class="tpi-select">
+            </select>
+        </sdpi-item>
+        <sdpi-item>
+            <div class="tpi-btn-group">
+                <button id="tpi-edit-cancel" class="tpi-btn tpi-btn-secondary">Cancel</button>
+                <button id="tpi-edit-save" class="tpi-btn">Save</button>
+            </div>
+        </sdpi-item>
+    </div>
+
+    <!-- ── Timer config (visible when an account is selected) ──────── -->
+    <div id="timer-section" class="tpi-hidden">
+        <sdpi-item label="Tag">
+            <select id="tags-select" class="tpi-select">
+                <option class="tpi-placeholder" value="" disabled selected>Loading…</option>
+            </select>
+        </sdpi-item>
+
+        <div id="tags-status"></div>
+
+        <sdpi-item label="Note">
+            <input id="timer-note" type="text" class="tpi-input" placeholder="Task description…" />
+        </sdpi-item>
+
+        <sdpi-item label="Show tag name">
+            <input id="timer-show-tag" type="checkbox" checked />
+        </sdpi-item>
+
+        <sdpi-item label="Show elapsed time">
+            <input id="timer-show-elapsed" type="checkbox" checked />
+        </sdpi-item>
+    </div>
+
+
+    <script>
+        window.addEventListener('load', function () {
+            const { streamDeckClient } = SDPIComponents;
+
+            // Allow right-click context menu on native inputs (CEF may suppress it otherwise).
+            document.addEventListener('contextmenu', function (e) { e.stopImmediatePropagation(); }, true);
+
+            // ── Element refs ──────────────────────────────────────────────────
+            const accountSection     = document.getElementById('tpi-account-section');
+            const accountSelect      = document.getElementById('tpi-account-select');
+            const removeBtn          = document.getElementById('tpi-remove-btn');
+            const loginSection       = document.getElementById('tpi-login-section');
+            const backendSelect      = document.getElementById('tpi-backend-select');
+            const traggoFields       = document.getElementById('tpi-traggo-fields');
+            const togglFields        = document.getElementById('tpi-toggl-fields');
+            const loginUrl           = document.getElementById('tpi-login-url');
+            const loginUser          = document.getElementById('tpi-login-user');
+            const loginPass          = document.getElementById('tpi-login-pass');
+            const togglToken         = document.getElementById('tpi-toggl-token');
+            const togglWorkspace     = document.getElementById('tpi-toggl-workspace');
+            const loginError         = document.getElementById('tpi-login-error');
+            const timerSection       = document.getElementById('timer-section');
+            const tagsSelect         = document.getElementById('tags-select');
+            const tagsStatus         = document.getElementById('tags-status');
+            const timerNote          = document.getElementById('timer-note');
+            const timerShowTag       = document.getElementById('timer-show-tag');
+            const timerShowElapsed   = document.getElementById('timer-show-elapsed');
+            const editBtn            = document.getElementById('tpi-edit-btn');
+            const editSection        = document.getElementById('tpi-edit-section');
+            const editLabel          = document.getElementById('tpi-edit-label');
+            const editInterval       = document.getElementById('tpi-edit-interval');
+
+            // ── State ─────────────────────────────────────────────────────────
+            let currentAccounts    = [];
+            let accountsLoaded     = false;
+            let currentAccountKey  = null;
+            let currentTagKey      = null;
+            let currentNote        = '';
+            let currentInterval    = '60';
+            let currentShowTagName = true;
+            let currentShowElapsed = true;
+            let pendingEdit        = false;
+            function saveSettings() {
+                streamDeckClient.setSettings({
+                    accountKey: currentAccountKey,
+                    tagKey:     currentTagKey,
+                    note:       currentNote,
+                    interval:   currentInterval,
+                    showTagName: currentShowTagName,
+                    showElapsed: currentShowElapsed,
+                });
+            }
+
+            function loadTagsForCurrentAccount() {
+                if (!currentAccountKey) return;
+                tagsSelect.innerHTML = '<option class="tpi-placeholder" value="" disabled selected>Loading…</option>';
+                tagsStatus.textContent = '';
+                tagsStatus.className = '';
+                streamDeckClient.send('sendToPlugin', { type: 'fetchTags', accountKey: currentAccountKey });
+            }
+
+            function renderAccounts() {
+                if (accountsLoaded && currentAccountKey && !currentAccounts.some(a => a.key === currentAccountKey)) {
+                    currentAccountKey = null;
+                }
+
+                while (accountSelect.options.length > 1) accountSelect.remove(1);
+                accountSelect.options[0].textContent = currentAccounts.length > 0 ? 'Select an account' : 'No account available';
+
+                for (const acc of currentAccounts) {
+                    const opt = document.createElement('option');
+                    opt.value       = acc.key;
+                    opt.textContent = acc.label;
+                    if (acc.key === currentAccountKey) opt.selected = true;
+                    accountSelect.appendChild(opt);
+                }
+
+                if (!currentAccountKey) accountSelect.selectedIndex = 0;
+
+                removeBtn.disabled = !currentAccountKey;
+                editBtn.disabled   = !currentAccountKey;
+                if (currentAccountKey) {
+                    const acc = currentAccounts.find(a => a.key === currentAccountKey);
+                    const accountInterval = acc?.interval || '60';
+                    if (accountInterval !== currentInterval) {
+                        currentInterval = accountInterval;
+                        saveSettings();
+                    }
+                    loadTagsForCurrentAccount();
+                }
+                timerSection.classList.toggle('tpi-hidden', !currentAccountKey);
+                accountSection.classList.remove('tpi-hidden');
+            }
+
+            // Polling rate options differ per backend: Toggl's API is rate-limited
+            // to 30 requests/hour and polls make 2 calls each, so minimum safe
+            // interval is ~5 minutes.
+            const INTERVAL_OPTIONS = {
+                traggo: [
+                    { value: '5',    label: '5 seconds' },
+                    { value: '15',   label: '15 seconds' },
+                    { value: '60',   label: '1 minute' },
+                    { value: '300',  label: '5 minutes' },
+                    { value: '3600', label: '1 hour' },
+                ],
+                toggl: [
+                    { value: '300',  label: '5 minutes' },
+                    { value: '900',  label: '15 minutes' },
+                    { value: '1800', label: '30 minutes' },
+                    { value: '3600', label: '1 hour' },
+                ],
+            };
+
+            function setIntervalOptions(selEl, backend, selectedValue) {
+                const opts = INTERVAL_OPTIONS[backend] || INTERVAL_OPTIONS.traggo;
+                selEl.innerHTML = '';
+                for (const o of opts) {
+                    const opt = document.createElement('option');
+                    opt.value = o.value;
+                    opt.textContent = o.label;
+                    if (o.value === selectedValue) opt.selected = true;
+                    selEl.appendChild(opt);
+                }
+            }
+
+            function resetLoginForm() {
+                loginUrl.value  = '';
+                loginUser.value = '';
+                loginPass.value = '';
+                togglToken.value = '';
+                togglWorkspace.innerHTML = '<option value="" disabled selected>No workspace available</option>';
+                backendSelect.value = 'traggo';
+                traggoFields.classList.remove('tpi-hidden');
+                togglFields.classList.add('tpi-hidden');
+                loginError.classList.add('tpi-hidden');
+                setIntervalOptions(document.getElementById('tpi-login-interval'), 'traggo', '60');
+            }
+
+            // ── Event listeners ───────────────────────────────────────────────
+            backendSelect.addEventListener('change', function () {
+                const isToggl = this.value === 'toggl';
+                traggoFields.classList.toggle('tpi-hidden', isToggl);
+                togglFields.classList.toggle('tpi-hidden', !isToggl);
+                loginError.classList.add('tpi-hidden');
+                setIntervalOptions(document.getElementById('tpi-login-interval'), this.value, isToggl ? '300' : '60');
+            });
+
+            togglToken.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); document.getElementById('tpi-toggl-load-btn').click(); }
+            });
+
+            [loginUrl, loginUser, loginPass].forEach(function (el) {
+                el.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('tpi-login-submit').click(); }
+                });
+            });
+
+            document.body.addEventListener('click', e => {
+                switch (e.target.id) {
+                    case 'tpi-add-btn':
+                        e.preventDefault();
+                        resetLoginForm();
+                        accountSection.classList.add('tpi-hidden');
+                        loginSection.classList.remove('tpi-hidden');
+                        break;
+
+                    case 'tpi-toggl-load-btn': {
+                        e.preventDefault();
+                        const token = togglToken.value.trim();
+                        if (!token) {
+                            loginError.textContent = 'API token is required.';
+                            loginError.classList.remove('tpi-hidden');
+                            return;
+                        }
+                        loginError.classList.add('tpi-hidden');
+                        togglWorkspace.innerHTML = '<option value="" disabled selected>Loading\u2026</option>';
+                        streamDeckClient.send('sendToPlugin', { type: 'fetchTogglWorkspaces', apiToken: token });
+                        break;
+                    }
+
+                    case 'tpi-toggl-get-btn':
+                        e.preventDefault();
+                        window.open('https://track.toggl.com/profile', '_blank');
+                        break;
+
+                    case 'tpi-login-submit': {
+                        e.preventDefault();
+                        const interval = document.getElementById('tpi-login-interval').value;
+                        if (backendSelect.value === 'toggl') {
+                            const token = togglToken.value.trim();
+                            const workspaceId = Number(togglWorkspace.value);
+                            const workspaceName = togglWorkspace.options[togglWorkspace.selectedIndex]?.textContent || '';
+                            if (!token || !workspaceId) {
+                                loginError.textContent = 'Enter your API token and select a workspace.';
+                                loginError.classList.remove('tpi-hidden');
+                                return;
+                            }
+                            loginError.classList.add('tpi-hidden');
+                            streamDeckClient.send('sendToPlugin', { type: 'loginToggl', apiToken: token, workspaceId, workspaceName, interval });
+                        } else {
+                            const url  = loginUrl.value.trim();
+                            const user = loginUser.value.trim();
+                            const pass = loginPass.value;
+                            if (!url || !user || !pass) {
+                                loginError.textContent = 'All fields are required.';
+                                loginError.classList.remove('tpi-hidden');
+                                return;
+                            }
+                            loginError.classList.add('tpi-hidden');
+                            streamDeckClient.send('sendToPlugin', { type: 'login', url, username: user, password: pass, interval });
+                        }
+                        break;
+                    }
+
+                    case 'tpi-login-cancel':
+                        e.preventDefault();
+                        resetLoginForm();
+                        loginSection.classList.add('tpi-hidden');
+                        accountSection.classList.remove('tpi-hidden');
+                        break;
+
+                    case 'tpi-remove-btn': {
+                        e.preventDefault();
+                        if (!currentAccountKey) break;
+                        const acc = currentAccounts.find(a => a.key === currentAccountKey);
+                        const label = acc ? acc.label : currentAccountKey;
+                        if (!confirm('Remove account "' + label + '"?')) break;
+                        streamDeckClient.send('sendToPlugin', { type: 'removeAccount', accountKey: currentAccountKey });
+                        break;
+                    }
+
+                    case 'tpi-edit-btn': {
+                        e.preventDefault();
+                        if (!currentAccountKey) break;
+                        const acc = currentAccounts.find(a => a.key === currentAccountKey);
+                        const backend = acc?.backend || 'traggo';
+                        editLabel.textContent = acc ? acc.label : currentAccountKey;
+                        setIntervalOptions(editInterval, backend, acc?.interval || (backend === 'toggl' ? '300' : '60'));
+                        accountSection.classList.add('tpi-hidden');
+                        editSection.classList.remove('tpi-hidden');
+                        break;
+                    }
+
+                    case 'tpi-edit-save': {
+                        e.preventDefault();
+                        if (!currentAccountKey) break;
+                        pendingEdit = true;
+                        streamDeckClient.send('sendToPlugin', { type: 'updateAccount', accountKey: currentAccountKey, interval: editInterval.value });
+                        break;
+                    }
+
+                    case 'tpi-edit-cancel':
+                        e.preventDefault();
+                        editSection.classList.add('tpi-hidden');
+                        accountSection.classList.remove('tpi-hidden');
+                        break;
+                }
+            });
+
+            accountSelect.addEventListener('change', function () {
+                currentAccountKey = this.value || null;
+                currentTagKey = null;
+                const acc = currentAccounts.find(a => a.key === currentAccountKey);
+                currentInterval = acc?.interval || '60';
+                removeBtn.disabled = !currentAccountKey;
+                editBtn.disabled   = !currentAccountKey;
+                if (currentAccountKey) loadTagsForCurrentAccount();
+                timerSection.classList.toggle('tpi-hidden', !currentAccountKey);
+                saveSettings();
+            });
+
+            tagsSelect.addEventListener('change', function () {
+                currentTagKey = this.value || null;
+                saveSettings();
+            });
+
+            timerNote.addEventListener('input', function () {
+                currentNote = this.value;
+                saveSettings();
+            });
+
+            timerShowTag.addEventListener('change', function () {
+                currentShowTagName = this.checked;
+                saveSettings();
+            });
+
+            timerShowElapsed.addEventListener('change', function () {
+                currentShowElapsed = this.checked;
+                saveSettings();
+            });
+
+            // ── Plugin → PI ───────────────────────────────────────────────────
+            streamDeckClient.sendToPropertyInspector.subscribe(function(event) {
+                const payload = event.payload;
+                switch (payload.type) {
+                    case 'accountsResult':
+                        currentAccounts = payload.accounts || [];
+                        accountsLoaded = true;
+                        if (pendingEdit) {
+                            pendingEdit = false;
+                            editSection.classList.add('tpi-hidden');
+                            accountSection.classList.remove('tpi-hidden');
+                        }
+                        renderAccounts();
+                        break;
+
+                    case 'loginResult':
+                        if (payload.error) {
+                            loginError.textContent = payload.error;
+                            loginError.classList.remove('tpi-hidden');
+                        } else {
+                            currentAccounts = payload.accounts || [];
+                            accountsLoaded = true;
+                            if (payload.newAccountKey) {
+                                currentAccountKey = payload.newAccountKey;
+                                saveSettings();
+                            }
+                            resetLoginForm();
+                            renderAccounts();
+                            loginSection.classList.add('tpi-hidden');
+                        }
+                        break;
+
+                    case 'tagsResult':
+                        if (payload.error) {
+                            tagsSelect.innerHTML = '';
+                            tagsStatus.textContent = 'Failed to load tags.';
+                            tagsStatus.className = 'error';
+                        } else {
+                            tagsStatus.textContent = '';
+                            tagsStatus.className = '';
+                            tagsSelect.innerHTML = '';
+                            const placeholder = document.createElement('option');
+                            placeholder.value = '';
+                            placeholder.disabled = true;
+                            placeholder.style.fontStyle = 'italic';
+                            placeholder.textContent = payload.tags.length > 0 ? 'Select a tag' : 'No tags defined';
+                            if (!currentTagKey) placeholder.selected = true;
+                            tagsSelect.appendChild(placeholder);
+                            for (const tag of payload.tags) {
+                                const opt = document.createElement('option');
+                                opt.value = tag.key;
+                                opt.textContent = tag.label ?? tag.key;
+                                if (tag.key === currentTagKey) opt.selected = true;
+                                tagsSelect.appendChild(opt);
+                            }
+                        }
+                        break;
+
+                    case 'togglWorkspacesResult':
+                        if (payload.error) {
+                            loginError.textContent = payload.error;
+                            loginError.classList.remove('tpi-hidden');
+                        } else {
+                            togglWorkspace.innerHTML = payload.workspaces.length !== 1
+                                ? '<option value="" disabled selected>Select a workspace</option>'
+                                : '';
+                            for (const ws of payload.workspaces) {
+                                const opt = document.createElement('option');
+                                opt.value = ws.id;
+                                opt.textContent = ws.name;
+                                togglWorkspace.appendChild(opt);
+                            }
+                            if (payload.workspaces.length === 1) togglWorkspace.value = payload.workspaces[0].id;
+                        }
+                        break;
+                }
+            });
+
+            // ── Restore saved settings ────────────────────────────────────────
+            streamDeckClient.didReceiveSettings.subscribe(function(event) {
+                const settings = (event.payload && event.payload.settings) || {};
+                currentAccountKey  = settings.accountKey || null;
+                currentTagKey      = settings.tagKey || null;
+                currentNote        = settings.note || '';
+                currentInterval    = settings.interval || '60';
+                currentShowTagName = settings.showTagName !== false;
+                currentShowElapsed = settings.showElapsed !== false;
+                timerNote.value          = currentNote;
+                timerShowTag.checked     = currentShowTagName;
+                timerShowElapsed.checked = currentShowElapsed;
+                if (accountsLoaded) renderAccounts();
+            });
+
+            // Load accounts on open
+            streamDeckClient.send('sendToPlugin', { type: 'getAccounts' });
+        });
+    </script>
+</body>
+
+</html>

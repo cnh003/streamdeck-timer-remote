@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Timer Dial Settings</title>
+    <meta charset="utf-8" />
+    <script src="sdpi-components.js"></script>
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+    <!-- ── Account section ───────────────────────────────────────────── -->
+    <div id="tpi-account-section" class="tpi-hidden">
+        <sdpi-item label="Account">
+            <div class="tpi-account-controls">
+                <select id="tpi-account-select" class="tpi-select">
+                    <option class="tpi-placeholder" value="" disabled selected>No account available</option>
+                </select>
+                <button id="tpi-add-btn" class="tpi-icon-btn" title="Add account">+</button>
+                <button id="tpi-edit-btn" class="tpi-icon-btn" title="Edit account" disabled><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button id="tpi-remove-btn" class="tpi-icon-btn" title="Remove account" disabled>&#x2212;</button>
+            </div>
+        </sdpi-item>
+    </div>
+
+    <!-- ── Login form (hidden until Add account is clicked) ──────────── -->
+    <div id="tpi-login-section" class="tpi-hidden">
+        <div class="tpi-section-heading">Add account</div>
+        <sdpi-item label="Backend">
+            <select id="tpi-backend-select" class="tpi-select">
+                <option value="traggo" selected>Traggo</option>
+                <option value="toggl">Toggl Track</option>
+            </select>
+        </sdpi-item>
+
+        <!-- Traggo-specific fields -->
+        <div id="tpi-traggo-fields">
+            <sdpi-item label="URL">
+                <input class="tpi-input" id="tpi-login-url" type="text" placeholder="http://traggo:3030" />
+            </sdpi-item>
+            <sdpi-item label="User">
+                <input class="tpi-input" id="tpi-login-user" type="text" placeholder="username" />
+            </sdpi-item>
+            <sdpi-item label="Password">
+                <input class="tpi-input" id="tpi-login-pass" type="password" placeholder="password" />
+            </sdpi-item>
+        </div>
+
+        <!-- Toggl-specific fields -->
+        <div id="tpi-toggl-fields" class="tpi-hidden">
+            <sdpi-item label="API token">
+                <div class="tpi-token-row">
+                    <input class="tpi-input" id="tpi-toggl-token" type="text" placeholder="Your Toggl API token" />
+                    <button class="tpi-btn" id="tpi-toggl-load-btn">Login</button>
+                    <button class="tpi-btn" id="tpi-toggl-get-btn" title="Open Toggl profile to copy your API token">Get</button>
+                </div>
+            </sdpi-item>
+            <sdpi-item label="Workspace">
+                <select id="tpi-toggl-workspace" class="tpi-select">
+                    <option value="" disabled selected>No workspace available</option>
+                </select>
+            </sdpi-item>
+        </div>
+
+        <sdpi-item label="Polling rate">
+            <select id="tpi-login-interval" class="tpi-select"></select>
+        </sdpi-item>
+        <sdpi-item>
+            <div class="tpi-btn-group">
+                <button class="tpi-btn tpi-btn-secondary" id="tpi-login-cancel">Cancel</button>
+                <button class="tpi-btn" id="tpi-login-submit">Log in</button>
+            </div>
+        </sdpi-item>
+        <div id="tpi-login-error" class="tpi-hidden"></div>
+    </div>
+
+    <!-- ── Edit account section ──────────────────────────────────────── -->
+    <div id="tpi-edit-section" class="tpi-hidden">
+        <div class="tpi-section-heading">Edit account</div>
+        <div class="tpi-field">
+            <span class="tpi-field-label">Account</span>
+            <span id="tpi-edit-label" style="display:flex;align-items:center;min-height:28px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+        </div>
+        <div class="tpi-field">
+            <label class="tpi-field-label" for="tpi-edit-interval">Interval</label>
+            <select id="tpi-edit-interval" class="tpi-select"></select>
+        </div>
+        <div class="tpi-field">
+            <span></span>
+            <div class="tpi-btn-group">
+                <button id="tpi-edit-cancel" class="tpi-btn tpi-btn-secondary">Cancel</button>
+                <button id="tpi-edit-save" class="tpi-btn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Dial config (visible when an account is selected) ────────── -->
+    <div id="dial-section" class="tpi-hidden">
+        <div id="tags-status"></div>
+        <div id="tag-filter-row" class="tpi-hidden">
+            <sdpi-item label="Tags to cycle">
+                <div id="tag-sort-list" class="tag-sort-list"></div>
+            </sdpi-item>
+        </div>
+        <sdpi-item label="Debug mode">
+                <sdpi-checkbox id="tpi-debug-checkbox">Show stats on dial</sdpi-checkbox>
+        </sdpi-item>
+    </div>
+
+    <script>
+        window.addEventListener('load', function () {
+            const { streamDeckClient } = SDPIComponents;
+
+            // Allow right-click context menu on native inputs (CEF may suppress it otherwise).
+            document.addEventListener('contextmenu', function (e) { e.stopImmediatePropagation(); }, true);
+
+            // ── Element refs ──────────────────────────────────────────────────
+            const accountSection     = document.getElementById('tpi-account-section');
+            const accountSelect      = document.getElementById('tpi-account-select');
+            const removeBtn          = document.getElementById('tpi-remove-btn');
+            const loginSection       = document.getElementById('tpi-login-section');
+            const loginUrl           = document.getElementById('tpi-login-url');
+            const loginUser          = document.getElementById('tpi-login-user');
+            const loginPass          = document.getElementById('tpi-login-pass');
+            const loginError         = document.getElementById('tpi-login-error');
+            const dialSection        = document.getElementById('dial-section');
+            const editBtn            = document.getElementById('tpi-edit-btn');
+            const editSection        = document.getElementById('tpi-edit-section');
+            const editLabel          = document.getElementById('tpi-edit-label');
+            const editInterval       = document.getElementById('tpi-edit-interval');
+            const tagsStatus         = document.getElementById('tags-status');
+            const tagFilterRow       = document.getElementById('tag-filter-row');
+            const tagSortList        = document.getElementById('tag-sort-list');
+            const backendSelect      = document.getElementById('tpi-backend-select');
+            const traggoFields       = document.getElementById('tpi-traggo-fields');
+            const togglFields        = document.getElementById('tpi-toggl-fields');
+            const togglToken         = document.getElementById('tpi-toggl-token');
+            const togglWorkspace     = document.getElementById('tpi-toggl-workspace');
+
+            // ── State ─────────────────────────────────────────────────────────
+            let currentAccounts      = [];
+            let accountsLoaded       = false; // true once first accountsResult arrives
+            let currentAccountKey    = null;
+            let currentInterval      = '60';
+            let currentTagOrder      = []; // ordered list of all known tag keys
+            let currentSelectedTags  = []; // enabled subset
+            let currentTagMeta       = {}; // per-tag display name and note overrides
+            let lastServerTags       = []; // last tag list received (for re-render on sort)
+            let currentDebug         = false;
+            let pendingEdit          = false;
+
+            function saveSettings() {
+                streamDeckClient.setSettings({
+                    accountKey:      currentAccountKey,
+                    interval:        currentInterval,
+                    tagOrder:        currentTagOrder,
+                    selectedTagKeys: currentSelectedTags,
+                    tagMeta:         currentTagMeta,
+                    debug:           currentDebug,
+                });
+            }
+
+            function loadTagsForCurrentAccount() {
+                if (!currentAccountKey) return;
+                tagsStatus.textContent = 'Loading tags…';
+                tagsStatus.className = '';
+                tagFilterRow.classList.add('tpi-hidden');
+                tagSortList.innerHTML = '';
+                streamDeckClient.send('sendToPlugin', { type: 'fetchTags', accountKey: currentAccountKey });
+            }
+
+            // Polling rate options differ per backend: Toggl's API is rate-limited
+            // to 30 requests/hour and polls make 2 calls each, so minimum safe
+            // interval is ~5 minutes.
+            const INTERVAL_OPTIONS = {
+                traggo: [
+                    { value: '5',    label: '5 seconds' },
+                    { value: '15',   label: '15 seconds' },
+                    { value: '60',   label: '1 minute' },
+                    { value: '300',  label: '5 minutes' },
+                    { value: '3600', label: '1 hour' },
+                ],
+                toggl: [
+                    { value: '300',  label: '5 minutes' },
+                    { value: '900',  label: '15 minutes' },
+                    { value: '1800', label: '30 minutes' },
+                    { value: '3600', label: '1 hour' },
+                ],
+            };
+
+            function setIntervalOptions(selEl, backend, selectedValue) {
+                const opts = INTERVAL_OPTIONS[backend] || INTERVAL_OPTIONS.traggo;
+                selEl.innerHTML = '';
+                for (const o of opts) {
+                    const opt = document.createElement('option');
+                    opt.value = o.value;
+                    opt.textContent = o.label;
+                    if (o.value === selectedValue) opt.selected = true;
+                    selEl.appendChild(opt);
+                }
+            }
+
+            function resetLoginForm() {
+                loginUrl.value  = '';
+                loginUser.value = '';
+                loginPass.value = '';
+                togglToken.value = '';
+                togglWorkspace.innerHTML = '<option value="" disabled selected>No workspace available</option>';
+                backendSelect.value = 'traggo';
+                traggoFields.classList.remove('tpi-hidden');
+                togglFields.classList.add('tpi-hidden');
+                loginError.classList.add('tpi-hidden');
+                setIntervalOptions(document.getElementById('tpi-login-interval'), 'traggo', '60');
+            }
+
+            // Toggle Traggo / Toggl field visibility when the backend selector changes.
+            backendSelect.addEventListener('change', function () {
+                const isToggl = this.value === 'toggl';
+                traggoFields.classList.toggle('tpi-hidden', isToggl);
+                togglFields.classList.toggle('tpi-hidden', !isToggl);
+                loginError.classList.add('tpi-hidden');
+                setIntervalOptions(document.getElementById('tpi-login-interval'), this.value, isToggl ? '300' : '60');
+            });
+
+            togglToken.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); document.getElementById('tpi-toggl-load-btn').click(); }
+            });
+
+            [loginUrl, loginUser, loginPass].forEach(function (el) {
+                el.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('tpi-login-submit').click(); }
+                });
+            });
+
+            var _dragSrcKey = null;
+
+            function renderTagList(serverTags) {
+                lastServerTags = serverTags;
+                const serverKeys = serverTags.map(t => t.key);
+
+                // Append any new tags to the order and selected lists by default.
+                let changed = false;
+                for (const key of serverKeys) {
+                    if (!currentTagOrder.includes(key)) {
+                        currentTagOrder.push(key);
+                        currentSelectedTags.push(key);
+                        changed = true;
+                    }
+                }
+                if (changed) saveSettings();
+
+                // Ordered display list — only tags present on the server.
+                const ordered = currentTagOrder.filter(k => serverKeys.includes(k));
+
+                const PENCIL_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
+                const CLOSE_SVG  = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+                tagSortList.innerHTML = '';
+                for (const key of ordered) {
+                    const tagDef   = lastServerTags.find(t => t.key === key);
+                    const meta     = currentTagMeta[key] || {};
+                    const apiLabel = (tagDef && tagDef.label) ? tagDef.label : key;
+
+                    const row = document.createElement('div');
+                    row.className   = 'tag-sort-row';
+                    row.draggable   = true;
+                    row.dataset.key = key;
+
+                    row.addEventListener('dragstart', function (e) {
+                        _dragSrcKey = key;
+                        e.dataTransfer.effectAllowed = 'move';
+                    });
+                    row.addEventListener('dragover', function (e) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        tagSortList.querySelectorAll('.tag-sort-row').forEach(r => r.classList.remove('drag-over'));
+                        this.classList.add('drag-over');
+                    });
+                    row.addEventListener('dragleave', function () {
+                        this.classList.remove('drag-over');
+                    });
+                    row.addEventListener('drop', function (e) {
+                        e.preventDefault();
+                        this.classList.remove('drag-over');
+                        if (_dragSrcKey === null || _dragSrcKey === key) return;
+                        const srcIdx  = currentTagOrder.indexOf(_dragSrcKey);
+                        const destIdx = currentTagOrder.indexOf(key);
+                        if (srcIdx === -1 || destIdx === -1) return;
+                        currentTagOrder.splice(srcIdx, 1);
+                        currentTagOrder.splice(destIdx, 0, _dragSrcKey);
+                        _dragSrcKey = null;
+                        renderTagList(lastServerTags);
+                        saveSettings();
+                    });
+                    row.addEventListener('dragend', function () {
+                        _dragSrcKey = null;
+                        tagSortList.querySelectorAll('.tag-sort-row').forEach(r => r.classList.remove('drag-over'));
+                    });
+
+                    // ── Checkbox ──────────────────────────────────────────────
+                    const cb = document.createElement('input');
+                    cb.type    = 'checkbox';
+                    cb.value   = key;
+                    cb.checked = currentSelectedTags.includes(key);
+                    cb.addEventListener('change', function () {
+                        if (this.checked) {
+                            if (!currentSelectedTags.includes(key)) currentSelectedTags.push(key);
+                        } else {
+                            currentSelectedTags = currentSelectedTags.filter(k => k !== key);
+                        }
+                        saveSettings();
+                    });
+
+                    // ── Collapsed label ───────────────────────────────────────
+                    const lbl = document.createElement('span');
+                    lbl.className   = 'tag-sort-label';
+                    lbl.textContent = meta.displayName || apiLabel;
+
+                    // ── Expanded edit fields ──────────────────────────────────
+                    const editFields = document.createElement('div');
+                    editFields.className = 'tag-edit-fields tpi-hidden';
+
+                    const nameInput = document.createElement('input');
+                    nameInput.className   = 'tag-meta-input';
+                    nameInput.type        = 'text';
+                    nameInput.placeholder = apiLabel;
+                    nameInput.value       = meta.displayName || '';
+                    nameInput.addEventListener('input', function () {
+                        if (!currentTagMeta[key]) currentTagMeta[key] = {};
+                        currentTagMeta[key].displayName = this.value.trim();
+                        lbl.textContent = this.value.trim() || apiLabel;
+                        saveSettings();
+                    });
+
+                    const noteInput = document.createElement('input');
+                    noteInput.className   = 'tag-meta-input';
+                    noteInput.type        = 'text';
+                    noteInput.placeholder = 'Note / comment';
+                    noteInput.value       = meta.note || '';
+                    noteInput.addEventListener('input', function () {
+                        if (!currentTagMeta[key]) currentTagMeta[key] = {};
+                        currentTagMeta[key].note = this.value;
+                        saveSettings();
+                    });
+
+                    editFields.appendChild(nameInput);
+                    editFields.appendChild(noteInput);
+
+                    // ── Edit toggle button ────────────────────────────────────
+                    const editToggleBtn = document.createElement('button');
+                    editToggleBtn.className = 'tpi-icon-btn-ghost';
+                    editToggleBtn.title     = 'Customize display name and note';
+                    editToggleBtn.innerHTML = PENCIL_SVG;
+                    editToggleBtn.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        const isEditing = !editFields.classList.contains('tpi-hidden');
+                        if (isEditing) {
+                            editFields.classList.add('tpi-hidden');
+                            lbl.classList.remove('tpi-hidden');
+                            this.innerHTML = PENCIL_SVG;
+                            this.title = 'Customize display name and note';
+                            row.draggable = true;
+                        } else {
+                            lbl.classList.add('tpi-hidden');
+                            editFields.classList.remove('tpi-hidden');
+                            this.innerHTML = CLOSE_SVG;
+                            this.title = 'Done';
+                            row.draggable = false;
+                            nameInput.focus();
+                        }
+                    });
+
+                    // ── Drag handle ───────────────────────────────────────────
+                    const handle = document.createElement('span');
+                    handle.className   = 'tag-drag-handle';
+                    handle.textContent = '\u2807';
+                    handle.title       = 'Drag to reorder';
+
+                    row.appendChild(cb);
+                    row.appendChild(lbl);
+                    row.appendChild(editFields);
+                    row.appendChild(editToggleBtn);
+                    row.appendChild(handle);
+                    tagSortList.appendChild(row);
+                }
+                tagFilterRow.classList.toggle('tpi-hidden', ordered.length === 0);
+            }
+
+            function renderAccounts() {
+                // Clear the saved key if it's no longer in the list (handles account removal).
+                // Guard: skip this check until we've received at least one accounts list from
+                // the plugin — otherwise an empty list would wrongly clear the key on first render.
+                if (accountsLoaded && currentAccountKey && !currentAccounts.some(a => a.key === currentAccountKey)) {
+                    currentAccountKey = null;
+                }
+
+                while (accountSelect.options.length > 1) accountSelect.remove(1);
+                accountSelect.options[0].textContent = currentAccounts.length > 0 ? 'Select an account' : 'No account available';
+
+                for (const acc of currentAccounts) {
+                    const opt   = document.createElement('option');
+                    opt.value       = acc.key;
+                    opt.textContent = acc.label;
+                    if (acc.key === currentAccountKey) opt.selected = true;
+                    accountSelect.appendChild(opt);
+                }
+
+                // When nothing is selected, force the placeholder to display so the
+                // browser doesn't auto-pick the only remaining non-disabled option.
+                if (!currentAccountKey) accountSelect.selectedIndex = 0;
+
+                removeBtn.disabled = !currentAccountKey;
+                editBtn.disabled   = !currentAccountKey;
+                const acc = currentAccounts.find(a => a.key === currentAccountKey);
+                const accountInterval = acc?.interval || '60';
+                if (accountInterval !== currentInterval) {
+                    currentInterval = accountInterval;
+                    saveSettings();
+                }
+                if (currentAccountKey) loadTagsForCurrentAccount();
+                dialSection.classList.toggle('tpi-hidden', !currentAccountKey);
+                accountSection.classList.remove('tpi-hidden');
+            }
+
+            // ── Event listeners ───────────────────────────────────────────────
+            document.body.addEventListener('click', e => {
+                switch (e.target.id) {
+                    case 'tpi-add-btn':
+                        e.preventDefault();
+                        resetLoginForm();
+                        accountSection.classList.add('tpi-hidden');
+                        loginSection.classList.remove('tpi-hidden');
+                        break;
+                    case 'tpi-toggl-load-btn': {
+                        e.preventDefault();
+                        const token = togglToken.value.trim();
+                        if (!token) {
+                            loginError.textContent = 'API token is required.';
+                            loginError.classList.remove('tpi-hidden');
+                            return;
+                        }
+                        loginError.classList.add('tpi-hidden');
+                        togglWorkspace.innerHTML = '<option value="" disabled selected>Loading\u2026</option>';
+                        streamDeckClient.send('sendToPlugin', { type: 'fetchTogglWorkspaces', apiToken: token });
+                        break;
+                    }
+                    case 'tpi-toggl-get-btn':
+                        e.preventDefault();
+                        window.open('https://track.toggl.com/profile', '_blank');
+                        break;
+                    case 'tpi-login-submit': {
+                        e.preventDefault();
+                        const interval = document.getElementById('tpi-login-interval').value;
+                        if (backendSelect.value === 'toggl') {
+                            const token = togglToken.value.trim();
+                            const workspaceId = Number(togglWorkspace.value);
+                            const workspaceName = togglWorkspace.options[togglWorkspace.selectedIndex]?.textContent || '';
+                            if (!token || !workspaceId) {
+                                loginError.textContent = 'Enter your API token and select a workspace.';
+                                loginError.classList.remove('tpi-hidden');
+                                return;
+                            }
+                            loginError.classList.add('tpi-hidden');
+                            streamDeckClient.send('sendToPlugin', { type: 'loginToggl', apiToken: token, workspaceId, workspaceName, interval });
+                        } else {
+                            const url  = loginUrl.value.trim();
+                            const user = loginUser.value.trim();
+                            const pass = loginPass.value;
+                            if (!url || !user || !pass) {
+                                loginError.textContent = 'All fields are required.';
+                                loginError.classList.remove('tpi-hidden');
+                                return;
+                            }
+                            loginError.classList.add('tpi-hidden');
+                            streamDeckClient.send('sendToPlugin', { type: 'login', url, username: user, password: pass, interval });
+                        }
+                        break;
+                    }
+                    case 'tpi-login-cancel':
+                        e.preventDefault();
+                        resetLoginForm();
+                        loginSection.classList.add('tpi-hidden');
+                        accountSection.classList.remove('tpi-hidden');
+                        break;
+                    case 'tpi-remove-btn': {
+                        e.preventDefault();
+                        if (!currentAccountKey) break;
+                        const acc = currentAccounts.find(a => a.key === currentAccountKey);
+                        const label = acc ? acc.label : currentAccountKey;
+                        if (!confirm('Remove account "' + label + '"?')) break;
+                        streamDeckClient.send('sendToPlugin', { type: 'removeAccount', accountKey: currentAccountKey });
+                        break;
+                    }
+                    case 'tpi-edit-btn': {
+                        e.preventDefault();
+                        if (!currentAccountKey) break;
+                        const acc = currentAccounts.find(a => a.key === currentAccountKey);
+                        const backend = acc?.backend || 'traggo';
+                        editLabel.textContent = acc ? acc.label : currentAccountKey;
+                        setIntervalOptions(editInterval, backend, acc?.interval || (backend === 'toggl' ? '300' : '60'));
+                        accountSection.classList.add('tpi-hidden');
+                        dialSection.classList.add('tpi-hidden');
+                        editSection.classList.remove('tpi-hidden');
+                        break;
+                    }
+                    case 'tpi-edit-save': {
+                        e.preventDefault();
+                        if (!currentAccountKey) break;
+                        pendingEdit = true;
+                        streamDeckClient.send('sendToPlugin', { type: 'updateAccount', accountKey: currentAccountKey, interval: editInterval.value });
+                        break;
+                    }
+                    case 'tpi-edit-cancel':
+                        e.preventDefault();
+                        editSection.classList.add('tpi-hidden');
+                        accountSection.classList.remove('tpi-hidden');
+                        dialSection.classList.toggle('tpi-hidden', !currentAccountKey);
+                        break;
+                }
+            });
+
+            accountSelect.addEventListener('change', function () {
+                currentAccountKey = this.value || null;
+                const acc = currentAccounts.find(a => a.key === currentAccountKey);
+                currentInterval = acc?.interval || '60';
+                removeBtn.disabled = !currentAccountKey;
+                editBtn.disabled   = !currentAccountKey;
+                if (currentAccountKey) loadTagsForCurrentAccount();
+                dialSection.classList.toggle('tpi-hidden', !currentAccountKey);
+                saveSettings();
+            });
+
+            document.getElementById('tpi-debug-checkbox').addEventListener('valuechange', function () {
+                currentDebug = this.value;
+                saveSettings();
+            });
+
+            // ── Plugin → PI ───────────────────────────────────────────────────
+            streamDeckClient.sendToPropertyInspector.subscribe(function(event) {
+                const payload = event.payload;
+                switch (payload.type) {
+                    case 'accountsResult':
+                        currentAccounts = payload.accounts || [];
+                        accountsLoaded = true;
+                        if (pendingEdit) {
+                            pendingEdit = false;
+                            editSection.classList.add('tpi-hidden');
+                            accountSection.classList.remove('tpi-hidden');
+                        }
+                        renderAccounts();
+                        break;
+                    case 'loginResult':
+                        if (payload.error) {
+                            loginError.textContent = payload.error;
+                            loginError.classList.remove('tpi-hidden');
+                        } else {
+                            currentAccounts = payload.accounts || [];
+                            accountsLoaded = true;
+                            if (payload.newAccountKey) {
+                                currentAccountKey = payload.newAccountKey;
+                                saveSettings();
+                            }
+                            resetLoginForm();
+                            renderAccounts();
+                            loginSection.classList.add('tpi-hidden');
+                            accountSection.classList.remove('tpi-hidden');
+                        }
+                        break;
+                    case 'togglWorkspacesResult':
+                        if (payload.error) {
+                            loginError.textContent = payload.error;
+                            loginError.classList.remove('tpi-hidden');
+                        } else {
+                            togglWorkspace.innerHTML = payload.workspaces.length !== 1
+                                ? '<option value="" disabled selected>Select a workspace</option>'
+                                : '';
+                            for (const ws of payload.workspaces) {
+                                const opt = document.createElement('option');
+                                opt.value       = ws.id;
+                                opt.textContent = ws.name;
+                                togglWorkspace.appendChild(opt);
+                            }
+                            if (payload.workspaces.length === 1) togglWorkspace.value = payload.workspaces[0].id;
+                        }
+                        break;
+                    case 'tagsResult': {
+                        if (payload.error) {
+                            tagsStatus.textContent = 'Could not load tags: ' + payload.error;
+                            tagsStatus.className = 'error';
+                            tagFilterRow.classList.add('tpi-hidden');
+                        } else {
+                            tagsStatus.textContent = '';
+                            tagsStatus.className = '';
+                            renderTagList(payload.tags);
+                        }
+                        break;
+                    }
+                    case 'dialState': {
+                        // No-op: current-tag row removed; dial face already shows current tag.
+                        break;
+                    }
+                }
+            });
+
+            // ── Restore saved settings ────────────────────────────────────────
+            streamDeckClient.didReceiveSettings.subscribe(function(event) {
+                const settings = (event.payload && event.payload.settings) || {};
+                currentAccountKey   = settings.accountKey || null;
+                currentInterval     = settings.interval || '60';
+                currentTagOrder     = Array.isArray(settings.tagOrder)        ? settings.tagOrder        : [];
+                currentSelectedTags = Array.isArray(settings.selectedTagKeys) ? settings.selectedTagKeys : [];
+                currentTagMeta      = (settings.tagMeta && typeof settings.tagMeta === 'object') ? settings.tagMeta : {};
+                currentDebug        = !!settings.debug;
+                document.getElementById('tpi-debug-checkbox').value = currentDebug;
+                // Only render now if accounts are already loaded; otherwise accountsResult
+                // will call renderAccounts() once both settings and accounts are available.
+                if (accountsLoaded) renderAccounts();
+            });
+
+            // Load accounts on open
+            streamDeckClient.send('sendToPlugin', { type: 'getAccounts' });
+        });
+    </script>
+</body>
+
+</html>
